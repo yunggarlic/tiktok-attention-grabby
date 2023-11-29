@@ -3,5 +3,5 @@ videos
 token.json
 credentials.json
 final_video_*
-__pycache__
+__pycache__/*
 output.json
