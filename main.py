@@ -1,65 +1,32 @@
-from moviepy.editor import VideoFileClip, clips_array
 from download_video import download_videos
-from format_video import one_video_format, two_video_format, finalize_video
+from format_video import finalize_videos, process_videos
+from timestamps import create_timestamps
 from collections import defaultdict
+from google_drive import google_login
 import json
 import os
 import shutil
-from audio_processing import stt, extract_audio, downsample_audio
 
-json_file = "video_urls.json"
-process_format = {
-    "one_video": one_video_format,
-    "two_video": two_video_format
-}
+# if os.path.exists("videos"):
+#     shutil.rmtree("videos")
 
-with open(json_file, "r") as f:
+# if os.path.exists("final_videos"):
+#     shutil.rmtree("final_videos")
+
+with open("video_urls.json", "r") as f:
     url_pairs = json.load(f)
 
-output_pairs = [["video-content.mp4", "crap-content.mp4"] for i in range(len(url_pairs))]
+google_creds = google_login()
 
 video_clips = defaultdict(dict)
-download_videos(url_pairs, output_pairs, video_clips)
-audio_path = extract_audio(video_clips[0]["content_url"], 0)
-stt(audio_path)
+folder_output_path = "./videos/videos_"
+download_videos(url_pairs, folder_output_path, video_clips)
 
-# mute_audio = [False, True]
-# processed_clips = []
+# create_timestamps(video_clips)
 
-# # Resize and crop each video of each pair
-# for i, clip_obj in enumerate(video_clips.values()):
-#     cur_format = url_pairs[i]["format"]
-#     processed_pair = {}
+processed_clips = []
+process_videos(url_pairs, video_clips, processed_clips)
 
-#     for j, (key, value) in enumerate(clip_obj.items()):
-#         # ex: video_0/video-content.mp4
-#         if key == "format":
-#             continue
-
-#         full_path = "videos_" + str(i) + "/" + value
-#         muted = True if key == "vibe_url" else False
-
-#         processed_video = process_format[cur_format](path=full_path, mute_audio=muted)
-#         processed_pair[key] = processed_video
-#     processed_clips.append({ "pair": processed_pair, "form": cur_format })
-
-# # Process and stack videos
-# for i, pair_obj in enumerate(processed_clips):
-#     output_path = "final_videos"
-#     clip_pair = pair_obj["pair"]
-#     cur_format = pair_obj["form"]
-
-#     if not os.path.exists(output_path):
-#         os.makedirs(output_path)
-    
-#     if cur_format == "two_video":
-#         final_video = clips_array([[clip_pair["content_url"]], [clip_pair["vibe_url"]]])  # Stacking vertically
-#     else:
-#         final_video = clip.pair["vibe_url"]
-#         final_video = final_video.set_audio(clip.pair["content_url"])
-
-#     final_video.write_videofile(output_path + "/" + f"final_video_{i}.mp4", codec="libx264", audio_codec="aac", fps=24)
-
-
-# for i in range(len(url_pairs)):
-#     shutil.rmtree("videos_" + str(i))
+# Finalize and write the processed clips to a new folder at output_path 
+output_path = "final_videos"
+finalize_videos(processed_clips, output_path, google_creds)
