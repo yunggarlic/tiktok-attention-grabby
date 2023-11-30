@@ -80,16 +80,23 @@ def process_timestamp(timestamp, path_to_content,path_to_vibe,i, format_func, ti
     else:
         print("Timestamp duration is longer than vibe duration, skipping")
 
-    print("timestamp", timestamped_clip_pairs)
 
-def process_content_clip_timestamps(clip_obj, timestamps, format_func, folder_path):
+    print(len(timestamped_clip_pairs))
+
+def process_content_clip_timestamps(clip_obj, folder_path):
+    process_format = {
+        "one_video": one_video_format,
+        "two_video": two_video_format
+    }
     # For every timestamp, process a subclip of the content video
+    with open(folder_path + "/timestamps.json", "r") as f:
+        timestamps = json.load(f)["timestamps"]
+
+    format_func = process_format[clip_obj["format"]]
+
     timestamped_clip_pairs = []
     path_to_content = folder_path + "/" + clip_obj["content_url"]
     path_to_vibe = folder_path + "/" + clip_obj["vibe_url"]
-
-    with open(folder_path + "/timestamps.json", "r") as f:
-        timestamps = json.load(f)["timestamps"]
 
     chunked_timestamps = chunk_list(timestamps, 4)
 
@@ -98,25 +105,11 @@ def process_content_clip_timestamps(clip_obj, timestamps, format_func, folder_pa
         for i, timestamp in enumerate(chunk):
             threads.append(create_thread(process_timestamp, (timestamp, path_to_content, path_to_vibe, i, format_func, timestamped_clip_pairs)))
         run_threads(threads)
+
+    for processed_pair in timestamped_clip_pairs:
+        processed_pair["form"] = clip_obj["format"]
+
     return timestamped_clip_pairs
-
-def process_videos(url_pairs, video_clips, processed_clips):
-    process_format = {
-        "one_video": one_video_format,
-        "two_video": two_video_format
-    }
-    for i, clip_obj in enumerate(video_clips.values()):
-        cur_format = url_pairs[i]["format"]
-        folder_path = "./videos/videos_" + str(i)
-
-        with open("./videos/videos_" + str(i) + "/timestamps.json", "r") as f:
-                timestamps = json.load(f)["timestamps"]
-        
-        # create content and vibe clips for each timestamp
-        processed_pairs = process_content_clip_timestamps(clip_obj, timestamps, process_format[cur_format], folder_path)
-        for processed_pair in processed_pairs:
-            processed_pair["form"] = cur_format
-            processed_clips.append(processed_pair)
 
 def finalize_video(clip_pair, format, filename, output_path, google_creds):
     if format == "two_video":
@@ -133,16 +126,27 @@ def finalize_video(clip_pair, format, filename, output_path, google_creds):
         
     full_filename = output_path + "/" + filename
     final_video.write_videofile(full_filename, codec="libx264", audio_codec="aac", fps=24)
+    
+    for clip in clip_pair.values():
+        clip.close()
+    final_video.close()
+    
     upload_file(full_filename, google_creds)
 
 
-def finalize_videos(processed_clips, output_path, google_creds):
+def finalize_videos(video_index, processed_clips, output_path, google_creds):
     
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-    for i, pair_obj in enumerate(processed_clips):
-        filename = f"final_video_{i}.mp4"
-        clip_pair=pair_obj["pair"]
-        format = pair_obj["form"]
-        finalize_video(clip_pair, format, filename, output_path, google_creds)
+    chunked_clips = chunk_list(processed_clips, 4)
+    j = 0
+    for chunk in chunked_clips:
+        processes = []
+        for pair_obj in chunk:
+            filename = f"final_video_{video_index}_{j}.mp4"
+            clip_pair=pair_obj["pair"]
+            format = pair_obj["form"]
+            processes.append(create_process(finalize_video, (clip_pair, format, filename, output_path, google_creds)))
+            j += 1
+        run_processes(processes)
