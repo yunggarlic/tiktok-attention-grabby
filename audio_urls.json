@@ -1,0 +1,32 @@
+[
+    {
+        "url": "https://www.youtube.com/watch?v=XpiJsanFucw",
+        "has_video": false,
+        "has_music": false
+    },
+    {
+        "url": "https://www.youtube.com/watch?v=_d3gcoxOgcc",
+        "has_video": true,
+        "has_music": true
+    },
+    {
+        "url": "https://www.youtube.com/watch?v=ivTYfOWXLmw",
+        "has_video": true,
+        "has_music": true
+    },
+    {
+        "url":"https://www.youtube.com/watch?v=KH1tlIHmCt8",
+        "has_video": true,
+        "has_music": false
+    },
+    {
+        "url": "https://www.youtube.com/watch?v=ogLc7M9_hR8",
+        "has_video": true,
+        "has_music": true
+    },
+    {
+        "url": "https://www.youtube.com/watch?v=KJ2MZ4lBYdo",
+        "has_video": true,
+        "has_music": true
+    }
+]
