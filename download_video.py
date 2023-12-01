@@ -1,37 +1,61 @@
 from pytube import YouTube
 import threading
+import re
+import json
+import os
+from utils import chunk_list, run_threads
 
-def download_video(key, url, index, output_path, folder_output_path, return_dict):
+def extract_youtube_id(url):
+    regex = r'(?:v=)([a-zA-Z0-9_-]{11})'
+    match = re.search(regex, url)
+    if match:
+       return match.group(1)
+    return None
+
+def cache_video(id):
+    if not os.path.exists("video_cache.json"):
+        with open("video_cache.json", "w") as f:
+            json.dump({id: True}, f)
+    else:
+        with open("video_cache.json", "r") as f:
+            cache = json.load(f)
+        cache[id] = True
+        with open("video_cache.json", "w") as f:
+            json.dump(cache, f)
+
+def download_asset(asset, output_path):
     print("Initializing Download")
     try:
-        yt = YouTube(url)
+        yt = YouTube(asset["url"])
         stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-        stream.download(filename=output_path, output_path=folder_output_path)
-        if return_dict[index] is None:
-            return_dict[index] = { key: output_path }
-        else:
-            return_dict[index][key] = output_path
+        stream.download(filename="asset.mp4", output_path=output_path)
 
-        print("Downloading Complete")
+        with open(output_path + "/" +"metadata.json", "w") as f:
+            json.dump(asset, f)
+        youtube_id = extract_youtube_id(asset["url"])
+
+        cache_video(youtube_id)
+        print(f"Downloading Complete || video id:{youtube_id} ")
 
     except Exception as e:
         print(f"Error downloading video: {e}")
 
-def download_videos(url_pairs, folder_output_path, video_clips):
-    for i in range(len(url_pairs)):
-        # for each pair of videos, download them in parallel
+def download_assets(assets, folder_output):
+    chunk_assets = chunk_list(assets, 4)
+    asset_paths = []
+    for chunk in chunk_assets:
         threads = []
-        
-        for _, (key, value) in enumerate(url_pairs[i].items()):
-            # for each video, create a thread to download it
-            if key != "content_url" and key != "vibe_url" :
-                continue
+        for asset in chunk:
+            youtube_id_folder_output = folder_output + extract_youtube_id(asset["url"])
+            asset["output_path"] = youtube_id_folder_output
+            if not os.path.exists(youtube_id_folder_output):  
+                threads.append(threading.Thread(target=download_asset, args=(asset, youtube_id_folder_output)))
             else:
-                output_name = "video-content.mp4" if key == "content_url" else "crap-content.mp4"
-                threads.append(threading.Thread(target=download_video, args=(key, value, i, output_name, folder_output_path  + str(i), video_clips)))
+                print("Asset already downloaded, skipping")
 
-        for thread in threads:
-            thread.start()
+            asset_paths.append(youtube_id_folder_output)
+        run_threads(threads)
 
-        for thread in threads:
-            thread.join()
+    print("Finished Downloading Assets under ", folder_output)
+
+    return asset_paths

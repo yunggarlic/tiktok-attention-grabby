@@ -3,7 +3,7 @@ from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 from datasets import load_dataset
 import librosa
 import soundfile as sf
-from moviepy.editor import VideoFileClip
+from moviepy.editor import VideoFileClip, AudioFileClip
 import json
 
 def stt(audio_path, t_output):
@@ -38,11 +38,11 @@ def stt(audio_path, t_output):
 
     return t_output
     
-
-def extract_audio(video_path, audio_path):
-    video = VideoFileClip(video_path)
-    video.audio.write_audiofile(audio_path, codec='pcm_s16le', ffmpeg_params=['-ac', '1'])
-    return audio_path
+def extract_audio(asset_path, output_path):
+    audio = AudioFileClip(asset_path)
+    audio_file_path = output_path + "/" + "audio.wav"
+    audio.write_audiofile(audio_file_path, codec='pcm_s16le', ffmpeg_params=['-ac', '1'])
+    return audio_file_path
 
 def downsample_audio(audio_path):
     original_audio, original_sample_rate = librosa.load(audio_path, sr=None)
