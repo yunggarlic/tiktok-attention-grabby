@@ -1,5 +1,6 @@
 from pytube import YouTube
-import threading
+from pytube.innertube import _default_clients
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 import json
 import os
@@ -12,17 +13,6 @@ def extract_youtube_id(url):
        return match.group(1)
     return None
 
-def cache_video(id):
-    if not os.path.exists("video_cache.json"):
-        with open("video_cache.json", "w") as f:
-            json.dump({id: True}, f)
-    else:
-        with open("video_cache.json", "r") as f:
-            cache = json.load(f)
-        cache[id] = True
-        with open("video_cache.json", "w") as f:
-            json.dump(cache, f)
-
 def download_asset(asset, output_path):
     print("Initializing Download")
     try:
@@ -33,29 +23,37 @@ def download_asset(asset, output_path):
         with open(output_path + "/" +"metadata.json", "w") as f:
             json.dump(asset, f)
         youtube_id = extract_youtube_id(asset["url"])
-
-        cache_video(youtube_id)
         print(f"Downloading Complete || video id:{youtube_id} ")
 
     except Exception as e:
         print(f"Error downloading video: {e}")
+        raise
 
 def download_assets(assets, folder_output):
-    chunk_assets = chunk_list(assets, 4)
     asset_paths = []
-    for chunk in chunk_assets:
-        threads = []
-        for asset in chunk:
-            youtube_id_folder_output = folder_output + extract_youtube_id(asset["url"])
-            asset["output_path"] = youtube_id_folder_output
-            if not os.path.exists(youtube_id_folder_output):  
-                threads.append(threading.Thread(target=download_asset, args=(asset, youtube_id_folder_output)))
+    with ThreadPoolExecutor(max_workers = 4) as executor:
+        future_to_asset = {}
+        for asset in assets:
+            youtube_id_output_path = os.path.join(folder_output, extract_youtube_id(asset["url"]))
+
+            if not os.path.exists(os.path.join(youtube_id_output_path, 'asset.mp4')): # check for cached videos
+                future = executor.submit(download_asset, asset, youtube_id_output_path)
+                future_to_asset[future] = youtube_id_output_path
             else:
                 print("Asset already downloaded, skipping")
+                asset_paths.append(youtube_id_output_path)
 
-            asset_paths.append(youtube_id_folder_output)
-        run_threads(threads)
-
+        for future in as_completed(future_to_asset):
+            try:
+                future.result()
+                print('appending future to asset', future_to_asset[future])
+                asset_paths.append(future_to_asset[future])
+            except Exception as e:
+                print(f"Error downloading video: {e}")
+    
     print("Finished Downloading Assets under ", folder_output)
-
     return asset_paths
+
+# return a list of folders in the path
+def get_local_video_paths(path):
+    return [os.path.join(path, folder) for folder in os.listdir(path)]
