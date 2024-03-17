@@ -11,11 +11,12 @@ import re
 from utils import create_process, run_processes
 import shutil
 
-from diffusers import StableDiffusionImg2ImgPipeline
+from diffusers import StableDiffusionXLImg2ImgPipeline, AutoPipelineForText2Image
 
 # load the pipeline
 device = "cuda"
-pipe = StableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", torch_dtype=torch.float16).to(
+
+pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-xl-refiner-1.0", torch_dtype=torch.float16, use_safetensors=True, variant="fp16").to(
     device
 )
 
@@ -30,12 +31,12 @@ else:
 init_image = Image.open("good-final.png").convert("RGB")
 init_image.thumbnail((768, 768))
 
-prompt1 = "vibrant, untouched landscape, growing trees, gently sloping mountains to the left, cezanne, long brush strokes, thick paint application, and a palette of warm, complementary colors. The scene should be centered, viewed through a single-point perspective, and zoomed in to highlight the lushness of the natural environment."
-prompt2 = "hunter gatherers working in the foreground. cezanne technique long strokes and thick paint, using warm, complementary colors. centered, single point perspective, zoomed in."
-prompt3 = "Illustrate a cozy, small town bustling with people walking together, set against a backdrop of centrally sloping mountains. Adopt Cezanne's painting style, characterized by long brush strokes and thick paint in warm, complementary colors. Include trees and a clear blue sky to enhance the scene. Focus on creating a balanced, centered composition."
-prompt4 = "Create a close-up scene of people walking together in a quaint, small town. The backdrop should feature mountains sloping towards the center. Use Cezanne's painting technique with pronounced long strokes and thick paint application. The color scheme should consist of warm, complementary colors. Ensure the composition is centered."
-prompt5 = "semi-agrarian landscape, people walking together in the foreground, sloping mountains in background, cezanne mixed with van gogh, long brush strokes and thick paint in a palette of warm, complementary colors. centered, trees and a blue sky, rural setting"
-prompt6 = "old town with people walking in the foreground, buildings and shops in the midground, cezanne, van gogh, long strokes and thick paint application in warm, complementary colors, center sloping mountains, scene focus centered and balanced."
+prompt1 = "growing, vibrant, untouched landscape, growing trees, gently sloping mountains to the left, van gogh, long brush strokes, thick paint application, and a balanced palette of warm, cool and, complementary colors. The scene should be centered, viewed through a single-point perspective, and zoomed in to highlight the lushness of the natural environment."
+prompt2 = "farmers working in the foreground. van gogh technique long strokes and thick paint, using warm, complementary colors. centered, single point perspective, zoomed in."
+prompt3 = "Illustrate a cozy, small town bustling with people walking together, set against a backdrop of centrally sloping mountains. Adopt van gogh's painting style, characterized by long brush strokes and thick paint in warm, complementary colors. Include trees and a clear blue sky to enhance the scene. Focus on creating a balanced, centered composition."
+prompt4 = "Create a close-up scene of people walking together in a quaint, small town. The backdrop should feature mountains sloping towards the center. Use van gogh's painting technique with pronounced long strokes and thick paint application. The color scheme should consist of warm, complementary colors. Ensure the composition is centered."
+prompt5 = "semi-agrarian landscape, people walking together in the foreground, sloping mountains in background, van gogh mixed with van gogh, long brush strokes and thick paint in a palette of warm, complementary colors. centered, trees and a blue sky, rural setting"
+prompt6 = "old town with people walking in the foreground, buildings and shops in the midground, van gogh, van gogh, long strokes and thick paint application in warm, complementary colors, center sloping mountains, scene focus centered and balanced."
 prompt1 = [prompt1] * 500
 prompt2 = [prompt2] * 500
 prompt3 = [prompt3] * 500
@@ -48,18 +49,21 @@ print(prompts)
 
 generator = torch.Generator(device=device).manual_seed(3523435)
 T = len(prompts) / 55 # period of the sawtooth wave
-A = (3 / 7) / 2  # amplitude (half the range of oscillation)
-offset = 0.5  # offset for the sine wave
+A = 0.25  # amplitude (half the range of oscillation)
+offset = 0.35  # offset for the sine wave
 
 for i, prompt in enumerate(prompts):
     # Calculate the sine wave value for strength
     print(f"Generating image {i}/{len(prompts)}")
-    strength = A * np.sin(2 * np.pi * i / T) + offset
+    strength = A * np.sin(2 * np.pi * i / T) + offset if i > 0 else 0.95
+    print(f"Strength: {strength}")
+
+    conditional = i % 10 == 0
 
     # Your image generation code
-    images = pipe(prompt=prompt, image=init_image, num_inference_steps=100, strength=strength, guidance_scale=11, generator=generator, num_images_per_prompt=1).images
+    images = pipe(prompt=prompt, image=init_image, num_inference_steps=150, strength=strength, guidance_scale=7.5, generator=generator, num_images_per_prompt=1).images
     images[0].save(f"cool/{i}_fantasy_landscape.png")
-    init_image = Image.open(f"cool/{i}_fantasy_landscape.png").convert("RGB")
+    init_image = images[0]
                             
 def interpolate_frames(frame1, frame2):
     print("Interpolating frames")
