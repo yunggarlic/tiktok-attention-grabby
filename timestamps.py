@@ -32,7 +32,7 @@ def transcribe_and_create_timestamps(audio_folders):
         print("Finished creating timestamps")
 
 def transcribe_audio(asset_file, output_folder, stt_path):
-    if not os.path.exists(os.path.join(output_folder, "audio.mp3")):
+    if not os.path.exists(os.path.join(output_folder, "audio.wav")):
         extract_audio(asset_file, output_folder)
 
     if not os.path.exists(stt_path):
